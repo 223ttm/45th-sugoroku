@@ -2,53 +2,82 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>関テレすごろく（演出強化版）</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>関テレすごろく（スマホ最適化版）</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>
-    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: #eef2f7; margin: 0; padding: 20px; }
-    h1 { color: #333; margin-bottom: 10px; }
-    .controls { margin-bottom: 20px; text-align: center; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
-    #turnInfo { font-size: 1.2rem; font-weight: bold; margin-bottom: 8px; }
-    .playerCounts { margin-bottom: 8px; display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; }
-    .playerCounts span { font-weight: bold; padding: 4px 10px; border-radius: 20px; background: #f0f0f0; border: 1px solid #ddd; }
-    #message { color: #d33; font-weight: bold; height: 1.5em; margin-bottom: 10px; }
+    /* 全体の高さを抑える設定 */
+    body { 
+        font-family: sans-serif; display: flex; flex-direction: column; align-items: center; 
+        background: #eef2f7; margin: 0; padding: 10px; 
+        height: 100vh; height: 100dvh; overflow: hidden; /* スクロール禁止 */
+    }
+    h1 { font-size: 1.2rem; color: #333; margin: 5px 0; }
+
+    .controls { 
+        margin-bottom: 10px; text-align: center; background: white; padding: 10px; 
+        border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+        width: 95%; max-width: 400px; box-sizing: border-box;
+    }
+    #turnInfo { font-size: 1rem; font-weight: bold; margin-bottom: 5px; }
+    .playerCounts { margin-bottom: 5px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; font-size: 0.8rem; }
+    .playerCounts span { font-weight: bold; padding: 2px 8px; border-radius: 15px; background: #f0f0f0; border: 1px solid #ddd; }
+    #message { color: #d33; font-weight: bold; height: 1.2em; margin-bottom: 5px; font-size: 0.9rem; }
     
-    /* 盤面 */
-    #board { display: grid; grid-template-columns: repeat(11, 40px); grid-template-rows: repeat(11, 40px); gap: 0; position: relative; padding: 5px; }
-    .square { width: 40px; height: 40px; background: white; border: 1px solid #ccc; position: relative; box-sizing: border-box; }
-    .empty { width: 40px; height: 40px; visibility: hidden; }
-    .square.event::after { content: '★'; position: absolute; inset: 0; border: 3px solid #ff69b4; color: #ff69b4; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; z-index: 25; pointer-events: none; }
-    .selectable { outline: 3px solid #ffd700; outline-offset: -3px; cursor: pointer; z-index: 30; animation: blink 0.8s infinite; }
+    /* 盤面のレスポンシブ設定：画面幅いっぱいに収める */
+    #board { 
+        display: grid; 
+        grid-template-columns: repeat(11, 1fr); 
+        grid-template-rows: repeat(11, 1fr); 
+        gap: 0; 
+        width: 95vw; 
+        height: 95vw; /* 正方形を維持 */
+        max-width: 400px; 
+        max-height: 400px;
+        background: transparent; 
+        position: relative; 
+    }
+
+    .square { 
+        width: 100%; height: 100%; background: white; border: 0.5px solid #ccc; 
+        position: relative; box-sizing: border-box; 
+    }
+    .empty { visibility: hidden; }
+    
+    .square.event::after { 
+        content: '★'; position: absolute; inset: 0; border: 2px solid #ff69b4; color: #ff69b4; 
+        display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 3vw; z-index: 25;
+    }
+    /* スマホでのイベント文字サイズ調整 */
+    @media screen and (min-width: 400px) { .square.event::after { font-size: 14px; } }
+
+    .selectable { outline: 3px solid #ffd700; outline-offset: -3px; z-index: 30; animation: blink 0.8s infinite; }
     @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    
     .cover { position: absolute; inset: 0; z-index: 20; }
-    .protected-indicator { position: absolute; right: 2px; top: 2px; width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.6); z-index: 40; border: 1px solid rgba(0,0,0,0.2); }
+    .protected-indicator { position: absolute; right: 1px; top: 1px; width: 4px; height: 4px; border-radius: 50%; background: rgba(255,255,255,0.8); z-index: 40; }
     
-    /* サイコロ */
-    #diceContainer { perspective: 600px; margin: 15px auto; width: 60px; height: 60px; }
-    #dice { width: 60px; height: 60px; position: relative; transform-style: preserve-3d; transition: transform 1.8s cubic-bezier(.2,.8,.2,1); }
-    .face { position: absolute; width: 60px; height: 60px; background: white; border: 2px solid #555; border-radius: 8px; display: flex; align-items: center; justify-content: center; backface-visibility: hidden; }
-    .face img { width: 80%; height: 80%; object-fit: contain; }
-    .front { transform: rotateY(0deg) translateZ(30px); }
-    .top { transform: rotateX(90deg) translateZ(30px); }
-    .right { transform: rotateY(90deg) translateZ(30px); }
-    .left { transform: rotateY(-90deg) translateZ(30px); }
-    .bottom { transform: rotateX(-90deg) translateZ(30px); }
-    .back { transform: rotateY(180deg) translateZ(30px); }
+    /* サイコロをさらにコンパクトに */
+    #diceContainer { perspective: 400px; margin: 5px auto; width: 40px; height: 40px; }
+    #dice { width: 40px; height: 40px; position: relative; transform-style: preserve-3d; transition: transform 1.8s cubic-bezier(.2,.8,.2,1); }
+    .face { position: absolute; width: 40px; height: 40px; background: white; border: 1.5px solid #555; border-radius: 5px; display: flex; align-items: center; justify-content: center; backface-visibility: hidden; }
+    .face img { width: 85%; height: 85%; object-fit: contain; }
+    .front  { transform: rotateY(0deg) translateZ(20px); }
+    .top    { transform: rotateX(90deg) translateZ(20px); }
+    .right  { transform: rotateY(90deg) translateZ(20px); }
+    .left   { transform: rotateY(-90deg) translateZ(20px); }
+    .bottom { transform: rotateX(-90deg) translateZ(20px); }
+    .back   { transform: rotateY(180deg) translateZ(20px); }
     
-    button { padding: 10px 25px; font-size: 16px; cursor: pointer; border-radius: 8px; border: none; background: #333; color: white; transition: 0.2s; }
-    button:disabled { background: #ccc; cursor: not-allowed; }
+    button { padding: 8px 20px; font-size: 14px; cursor: pointer; border-radius: 8px; border: none; background: #333; color: white; }
+    button:disabled { background: #ccc; }
 
-    /* 共通オーバーレイ設定 */
-    .full-overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 3000; pointer-events: none; opacity: 0; visibility: hidden; transition: 0.3s; background: rgba(0,0,0,0.85); }
+    /* オーバーレイ */
+    .full-overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 3000; background: rgba(0,0,0,0.85); opacity: 0; visibility: hidden; transition: 0.3s; }
     .full-overlay.show { opacity: 1; visibility: visible; }
-    .overlay-content { transform: scale(0.5); transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-align: center; }
+    .overlay-content { transform: scale(0.7); transition: 0.4s; text-align: center; width: 90%; }
     .full-overlay.show .overlay-content { transform: scale(1); }
-
-    /* 特殊演出テキスト */
-    .result-text-main { font-size: 5rem; font-weight: 900; font-family: 'Arial Black', sans-serif; margin: 0; }
-    .result-text-sub { font-size: 2.5rem; color: white; font-weight: bold; margin-top: 10px; text-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .result-text-main { font-size: 3rem; font-weight: 900; margin: 0; }
+    .result-text-sub { font-size: 1.5rem; color: white; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -76,13 +105,14 @@
 
 <div id="systemOverlay" class="full-overlay">
     <div class="overlay-content">
-        <div id="sysLabel" style="font-size: 2rem; color: #aaa; margin-bottom: 10px;"></div>
+        <div id="sysLabel" style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;"></div>
         <div id="sysMainText" class="result-text-main"></div>
         <div id="sysSubText" class="result-text-sub"></div>
     </div>
 </div>
 
 <script>
+// JavaScript ロジックは前回と同じ（変数定義などはそのまま）
 const size = 11;
 let players = [{ color:"#00cc44" }, { color:"#dc143c" }, { color:"#9933ff" }, { color:"#3366ff" }];
 let currentPlayer = 0, stepsRemaining = 0, isMoving = false, isAwaitingChoice = false, isOverlaying = false;
@@ -175,7 +205,6 @@ function updateTurnColor() {
 
 function updatePlayerCounts() { playerCountsEl.innerHTML = players.map((p, i) => `<span style="color:${p.color}">P${i+1}: ${territoryCounts[i]}</span>`).join(''); }
 
-// 共通オーバーレイ表示関数
 function showSystemOverlay(label, main, sub, color, duration, callback) {
     isOverlaying = true;
     sysLabel.textContent = label;
@@ -196,7 +225,7 @@ function endTurn() {
     stepsRemaining = 0;
     diceBtn.disabled = true;
     message.textContent = "";
-    showSystemOverlay("Next Turn", `P${currentPlayer+1}`, "あなたの番です", players[currentPlayer].color, 1500, () => {
+    showSystemOverlay("Next Turn", `P${currentPlayer+1}`, "あなたの番です", players[currentPlayer].color, 1200, () => {
         updateTurnColor(); updateSelectableSquares(); diceBtn.disabled = false;
     });
 }
@@ -218,11 +247,12 @@ function showEventChoice(row, col) {
     document.body.appendChild(overlay);
 
     function showConfirmation() {
-        overlay.innerHTML = `<div style="background: white; padding: 40px; border-radius: 25px; text-align: center; border: 5px solid #ffd700;"><h2 style="color: #ff69b4;">★ EVENT ★</h2><p>未知のエリアだ！挑戦しますか？</p><div style="display: flex; gap: 20px; justify-content: center;"><button id="btnChallenge" style="background: #ff4d4d; color: white; padding: 10px 20px; border-radius: 50px;">挑戦する！</button><button id="btnSkip" style="background: #888; color: white; padding: 10px 20px; border-radius: 50px;">やめておく</button></div></div>`;
+        overlay.innerHTML = `<div style="background: white; padding: 20px; border-radius: 20px; text-align: center; border: 5px solid #ffd700; width: 80%; max-width: 300px;"><h3 style="color: #ff69b4; margin: 0 0 10px;">★ EVENT ★</h3><p style="font-size:0.9rem;">ミッションに挑戦する？</p><div style="display: flex; gap: 10px; justify-content: center;"><button id="btnChallenge" style="background: #ff4d4d; color: white; padding: 8px 15px; border-radius: 50px; font-size:0.8rem;">挑戦する！</button><button id="btnSkip" style="background: #888; color: white; padding: 8px 15px; border-radius: 50px; font-size:0.8rem;">やめておく</button></div></div>`;
         document.getElementById('btnChallenge').onclick = () => {
-            overlay.innerHTML = `<div style="background: white; padding: 50px; border-radius: 25px; text-align: center; border: 8px solid ${pColor};"><h2 style="color: #555;">Now challenging</h2><div style="font-size: 3rem; font-weight: 900; color: ${pColor}; margin: 20px 0;">Player ${currentPlayer+1}</div><p>ミッションを実行中...</p><button id="btnFinish" style="background: #333; color: white; padding: 15px 30px; border-radius: 10px;">終了</button></div>`;
+            overlay.innerHTML = `<div style="background: white; padding: 30px; border-radius: 20px; text-align: center; border: 5px solid ${pColor}; width: 80%; max-width: 300px;"><h3>Now challenging</h3><div style="font-size: 2rem; font-weight: 900; color: ${pColor}; margin: 10px 0;">P${currentPlayer+1}</div><p style="font-size:0.8rem;">ミッション実行中…</p><button id="btnFinish" style="background: #333; color: white; padding: 10px 20px; border-radius: 10px;">終了</button></div>`;
             document.getElementById('btnFinish').onclick = () => {
-                overlay.innerHTML = `<div style="background: white; padding: 40px; border-radius: 25px; text-align: center; border: 5px solid #ff4500;"><h2>Result</h2><p>結果はどうでしたか？</p><div style="display: flex; gap: 20px; justify-content: center;"><button id="btnSuccess" style="background: #00c853; color: white; padding: 10px 20px; border-radius: 50px;">SUCCESS</button><button id="btnFailure" style="background: #d50000; color: white; padding: 10px 20px; border-radius: 50px;">FAILED</button></div></div>`;
+                // SUCCESSとFAILEDのボタン間隔を gap: 20px に広げました
+                overlay.innerHTML = `<div style="background: white; padding: 20px; border-radius: 20px; text-align: center; border: 5px solid #ff4500; width: 80%; max-width: 300px;"><h3>Result</h3><p style="font-size:0.8rem;">結果を教えてね！…</p><div style="display: flex; gap: 20px; justify-content: center;"><button id="btnSuccess" style="background: #00c853; color: white; padding: 10px 20px; border-radius: 50px;">SUCCESS</button><button id="btnFailure" style="background: #d50000; color: white; padding: 10px 20px; border-radius: 50px;">FAILED</button></div></div>`;
                 document.getElementById('btnSuccess').onclick = () => handleResult(true);
                 document.getElementById('btnFailure').onclick = () => handleResult(false);
             };
@@ -234,16 +264,9 @@ function showEventChoice(row, col) {
         document.body.removeChild(overlay);
         isAwaitingChoice = false;
         let main, sub, color;
-        if(isSuccess) {
-            stepsRemaining += 2; main = "SUCCESS!!"; sub = "ボーナス +2マス！"; color = "#00c853";
-        } else {
-            color = "#d50000"; main = "FAILED...";
-            if(stepsRemaining >= 2) { stepsRemaining -= 2; sub = "歩数没収 (-2マス)"; }
-            else { stepsRemaining = 0; revertOwnTerritoryByHistory(currentPlayer, 2); sub = "陣地没収！"; }
-        }
-        showSystemOverlay("Mission Result", main, sub, color, 2000, () => {
-            if(stepsRemaining > 0) { updateSelectableSquares(); updateTurnColor(); } else { endTurn(); }
-        });
+        if(isSuccess) { stepsRemaining += 2; main = "SUCCESS!!"; sub = "+2マス！"; color = "#00c853"; } 
+        else { color = "#d50000"; main = "FAILED..."; if(stepsRemaining >= 2) { stepsRemaining -= 2; sub = "-2マス"; } else { stepsRemaining = 0; revertOwnTerritoryByHistory(currentPlayer, 2); sub = "陣地没収！"; } }
+        showSystemOverlay("Result", main, sub, color, 1500, () => { if(stepsRemaining > 0) { updateSelectableSquares(); updateTurnColor(); } else { endTurn(); } });
     }
     showConfirmation();
 }
