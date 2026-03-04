@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>関テレすごろく（演出強化版）</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: #eef2f7; margin: 0; padding: 20px; }
+    h1 { color: #333; margin-bottom: 10px; }
+    .controls { margin-bottom: 20px; text-align: center; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
+    #turnInfo { font-size: 1.2rem; font-weight: bold; margin-bottom: 8px; }
+    .playerCounts { margin-bottom: 8px; display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; }
+    .playerCounts span { font-weight: bold; padding: 4px 10px; border-radius: 20px; background: #f0f0f0; border: 1px solid #ddd; }
+    #message { color: #d33; font-weight: bold; height: 1.5em; margin-bottom: 10px; }
+    
+    /* 盤面 */
+    #board { display: grid; grid-template-columns: repeat(11, 40px); grid-template-rows: repeat(11, 40px); gap: 0; position: relative; padding: 5px; }
+    .square { width: 40px; height: 40px; background: white; border: 1px solid #ccc; position: relative; box-sizing: border-box; }
+    .empty { width: 40px; height: 40px; visibility: hidden; }
+    .square.event::after { content: '★'; position: absolute; inset: 0; border: 3px solid #ff69b4; color: #ff69b4; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; z-index: 25; pointer-events: none; }
+    .selectable { outline: 3px solid #ffd700; outline-offset: -3px; cursor: pointer; z-index: 30; animation: blink 0.8s infinite; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    .cover { position: absolute; inset: 0; z-index: 20; }
+    .protected-indicator { position: absolute; right: 2px; top: 2px; width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.6); z-index: 40; border: 1px solid rgba(0,0,0,0.2); }
+    
+    /* サイコロ */
+    #diceContainer { perspective: 600px; margin: 15px auto; width: 60px; height: 60px; }
+    #dice { width: 60px; height: 60px; position: relative; transform-style: preserve-3d; transition: transform 1.8s cubic-bezier(.2,.8,.2,1); }
+    .face { position: absolute; width: 60px; height: 60px; background: white; border: 2px solid #555; border-radius: 8px; display: flex; align-items: center; justify-content: center; backface-visibility: hidden; }
+    .face img { width: 80%; height: 80%; object-fit: contain; }
+    .front { transform: rotateY(0deg) translateZ(30px); }
+    .top { transform: rotateX(90deg) translateZ(30px); }
+    .right { transform: rotateY(90deg) translateZ(30px); }
+    .left { transform: rotateY(-90deg) translateZ(30px); }
+    .bottom { transform: rotateX(-90deg) translateZ(30px); }
+    .back { transform: rotateY(180deg) translateZ(30px); }
+    
+    button { padding: 10px 25px; font-size: 16px; cursor: pointer; border-radius: 8px; border: none; background: #333; color: white; transition: 0.2s; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+
+    /* 共通オーバーレイ設定 */
+    .full-overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 3000; pointer-events: none; opacity: 0; visibility: hidden; transition: 0.3s; background: rgba(0,0,0,0.85); }
+    .full-overlay.show { opacity: 1; visibility: visible; }
+    .overlay-content { transform: scale(0.5); transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-align: center; }
+    .full-overlay.show .overlay-content { transform: scale(1); }
+
+    /* 特殊演出テキスト */
+    .result-text-main { font-size: 5rem; font-weight: 900; font-family: 'Arial Black', sans-serif; margin: 0; }
+    .result-text-sub { font-size: 2.5rem; color: white; font-weight: bold; margin-top: 10px; text-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head>
+<body>
+
+<h1>関テレすごろく</h1>
+
+<div class="controls">
+  <div id="turnInfo">準備中...</div>
+  <div class="playerCounts" id="playerCounts"></div>
+  <div id="message"></div>
+  <div id="diceContainer">
+      <div id="dice">
+          <div class="face front"><img src="hatiemonn1.png" alt="1"></div>
+          <div class="face top"><img src="hatiemonn2.png" alt="2"></div>
+          <div class="face right"><img src="hatiemonn3.png" alt="3"></div>
+          <div class="face left"><img src="hatiemonn4.png" alt="4"></div>
+          <div class="face bottom"><img src="hatiemonn5.png" alt="5"></div>
+          <div class="face back"><img src="hatiemonn6.png" alt="6"></div>
+      </div>
+  </div>
+  <button id="diceBtn">サイコロを振る</button>
+</div>
+
+<div id="board"></div>
+
+<div id="systemOverlay" class="full-overlay">
+    <div class="overlay-content">
+        <div id="sysLabel" style="font-size: 2rem; color: #aaa; margin-bottom: 10px;"></div>
+        <div id="sysMainText" class="result-text-main"></div>
+        <div id="sysSubText" class="result-text-sub"></div>
+    </div>
+</div>
+
+<script>
+const size = 11;
+let players = [{ color:"#00cc44" }, { color:"#dc143c" }, { color:"#9933ff" }, { color:"#3366ff" }];
+let currentPlayer = 0, stepsRemaining = 0, isMoving = false, isAwaitingChoice = false, isOverlaying = false;
+let boardMap = [], territoryCounts = [0,0,0,0], paintHistory = [[],[],[],[]], currentX = 0, currentY = 0;
+
+const board = document.getElementById("board"), diceBtn = document.getElementById("diceBtn"), turnInfo = document.getElementById("turnInfo");
+const message = document.getElementById("message"), dice = document.getElementById("dice"), playerCountsEl = document.getElementById("playerCounts");
+const systemOverlay = document.getElementById("systemOverlay"), sysLabel = document.getElementById("sysLabel"), sysMainText = document.getElementById("sysMainText"), sysSubText = document.getElementById("sysSubText");
+
+function isStartPosition(r,c){ return (r===0&&c===0) || (r===0&&c===size-1) || (r===size-1&&c===0) || (r===size-1&&c===size-1); }
+
+function initBoard() {
+    board.innerHTML = "";
+    for(let r=0; r<size; r++){
+        boardMap[r]=[];
+        for(let c=0; c<size; c++){
+            const square=document.createElement("div");
+            const isBorder=(r===0||r===size-1||c===0||c===size-1), isMiddleRow=(r===Math.floor(size/2)), isMiddleCol=(c===Math.floor(size/2));
+            square.id=`square-${r}-${c}`;
+            if(isBorder || isMiddleRow || isMiddleCol) {
+                square.className = "square";
+                const prot = isStartPosition(r,c);
+                boardMap[r][c] = { state: 0, protected: prot, removed: false, isEvent: false };
+                if(prot) { const ind = document.createElement('div'); ind.className = 'protected-indicator'; square.appendChild(ind); }
+            } else { square.className = "empty"; boardMap[r][c] = { state: null, removed: true }; }
+            board.appendChild(square);
+        }
+    }
+}
+
+function paintSquare(row, col, color, isInitial=false, painterIndex=null) {
+    const cell = boardMap[row][col];
+    if(!cell || cell.removed || (cell.protected && !isInitial)) return;
+    const sq = document.getElementById(`square-${row}-${col}`);
+    if(cell.state && cell.state !== 0 && cell.state !== color) {
+        const prevIdx = players.findIndex(p => p.color === cell.state);
+        if(prevIdx !== -1) { territoryCounts[prevIdx]--; paintHistory[prevIdx] = paintHistory[prevIdx].filter(h => !(h.row===row && h.col===col)); }
+    }
+    cell.state = color;
+    const curIdx = players.findIndex(p => p.color === color);
+    if(curIdx !== -1) territoryCounts[curIdx]++;
+    const oldCover = sq.querySelector('.cover'); if(oldCover) sq.removeChild(oldCover);
+    const cover = document.createElement('div'); cover.className = 'cover'; cover.style.background = color; sq.appendChild(cover);
+    if(!isInitial && painterIndex !== null) paintHistory[painterIndex].push({row, col});
+    updatePlayerCounts();
+}
+
+function canMove(r, c) {
+    const cell = boardMap[r][c];
+    if(!cell || cell.removed || cell.protected || cell.state === players[currentPlayer].color) return false;
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+    return dirs.some(([dr, dc]) => {
+        const nr=r+dr, nc=c+dc;
+        return nr>=0 && nr<size && nc>=0 && nc<size && boardMap[nr][nc].state === players[currentPlayer].color;
+    });
+}
+
+function updateSelectableSquares() {
+    document.querySelectorAll(".square").forEach(el => el.classList.remove("selectable"));
+    if(stepsRemaining <= 0 || isOverlaying) return;
+    let anyPossible = false;
+    for(let r=0; r<size; r++) {
+        for(let c=0; c<size; c++) {
+            if(canMove(r, c)) { const targetEl = document.getElementById(`square-${r}-${c}`); if(targetEl) { targetEl.classList.add("selectable"); anyPossible = true; } }
+        }
+    }
+    if(!anyPossible && stepsRemaining > 0) { message.textContent = "進める場所がありません！"; setTimeout(endTurn, 1000); }
+}
+
+function revertOwnTerritoryByHistory(playerIndex, count) {
+    const hist = paintHistory[playerIndex];
+    let removed = 0;
+    while (hist.length > 0 && removed < count) {
+        const last = hist.pop();
+        const {row, col} = last;
+        const cell = boardMap[row][col];
+        if (cell && cell.state === players[playerIndex].color && !cell.protected) {
+            const sq = document.getElementById(`square-${row}-${col}`);
+            const cover = sq?.querySelector('.cover'); if (cover) sq.removeChild(cover);
+            cell.state = 0; territoryCounts[playerIndex]--; removed++;
+        }
+    }
+    updatePlayerCounts();
+}
+
+function updateTurnColor() {
+    turnInfo.style.color = players[currentPlayer].color;
+    turnInfo.textContent = `P${currentPlayer+1}の番です${stepsRemaining > 0 ? `（残り ${stepsRemaining}）` : ''}`;
+}
+
+function updatePlayerCounts() { playerCountsEl.innerHTML = players.map((p, i) => `<span style="color:${p.color}">P${i+1}: ${territoryCounts[i]}</span>`).join(''); }
+
+// 共通オーバーレイ表示関数
+function showSystemOverlay(label, main, sub, color, duration, callback) {
+    isOverlaying = true;
+    sysLabel.textContent = label;
+    sysMainText.textContent = main;
+    sysMainText.style.color = color;
+    sysMainText.style.textShadow = `0 0 15px ${color}, 0 0 2px white`;
+    sysSubText.textContent = sub;
+    systemOverlay.classList.add('show');
+    setTimeout(() => {
+        systemOverlay.classList.remove('show');
+        isOverlaying = false;
+        if(callback) callback();
+    }, duration);
+}
+
+function endTurn() {
+    currentPlayer = (currentPlayer + 1) % players.length;
+    stepsRemaining = 0;
+    diceBtn.disabled = true;
+    message.textContent = "";
+    showSystemOverlay("Next Turn", `P${currentPlayer+1}`, "あなたの番です", players[currentPlayer].color, 1500, () => {
+        updateTurnColor(); updateSelectableSquares(); diceBtn.disabled = false;
+    });
+}
+
+function placeEvents(num) {
+    let count = 0;
+    while(count < num) {
+        let r = Math.floor(Math.random()*size), c = Math.floor(Math.random()*size);
+        const cell = boardMap[r][c], sq = document.getElementById(`square-${r}-${c}`);
+        if(cell && !cell.removed && !cell.protected && !cell.isEvent && sq && sq.classList.contains("square")) { cell.isEvent = true; sq.classList.add("event"); count++; }
+    }
+}
+
+function showEventChoice(row, col) {
+    isAwaitingChoice = true;
+    const pColor = players[currentPlayer].color;
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 1000; animation: fadeIn 0.3s ease-out;`;
+    document.body.appendChild(overlay);
+
+    function showConfirmation() {
+        overlay.innerHTML = `<div style="background: white; padding: 40px; border-radius: 25px; text-align: center; border: 5px solid #ffd700;"><h2 style="color: #ff69b4;">★ EVENT ★</h2><p>未知のエリアだ！挑戦しますか？</p><div style="display: flex; gap: 20px; justify-content: center;"><button id="btnChallenge" style="background: #ff4d4d; color: white; padding: 10px 20px; border-radius: 50px;">挑戦する！</button><button id="btnSkip" style="background: #888; color: white; padding: 10px 20px; border-radius: 50px;">やめておく</button></div></div>`;
+        document.getElementById('btnChallenge').onclick = () => {
+            overlay.innerHTML = `<div style="background: white; padding: 50px; border-radius: 25px; text-align: center; border: 8px solid ${pColor};"><h2 style="color: #555;">Now challenging</h2><div style="font-size: 3rem; font-weight: 900; color: ${pColor}; margin: 20px 0;">Player ${currentPlayer+1}</div><p>ミッションを実行中...</p><button id="btnFinish" style="background: #333; color: white; padding: 15px 30px; border-radius: 10px;">終了</button></div>`;
+            document.getElementById('btnFinish').onclick = () => {
+                overlay.innerHTML = `<div style="background: white; padding: 40px; border-radius: 25px; text-align: center; border: 5px solid #ff4500;"><h2>Result</h2><p>結果はどうでしたか？</p><div style="display: flex; gap: 20px; justify-content: center;"><button id="btnSuccess" style="background: #00c853; color: white; padding: 10px 20px; border-radius: 50px;">SUCCESS</button><button id="btnFailure" style="background: #d50000; color: white; padding: 10px 20px; border-radius: 50px;">FAILED</button></div></div>`;
+                document.getElementById('btnSuccess').onclick = () => handleResult(true);
+                document.getElementById('btnFailure').onclick = () => handleResult(false);
+            };
+        };
+        document.getElementById('btnSkip').onclick = () => { document.body.removeChild(overlay); isAwaitingChoice = false; endTurn(); };
+    }
+
+    function handleResult(isSuccess) {
+        document.body.removeChild(overlay);
+        isAwaitingChoice = false;
+        let main, sub, color;
+        if(isSuccess) {
+            stepsRemaining += 2; main = "SUCCESS!!"; sub = "ボーナス +2マス！"; color = "#00c853";
+        } else {
+            color = "#d50000"; main = "FAILED...";
+            if(stepsRemaining >= 2) { stepsRemaining -= 2; sub = "歩数没収 (-2マス)"; }
+            else { stepsRemaining = 0; revertOwnTerritoryByHistory(currentPlayer, 2); sub = "陣地没収！"; }
+        }
+        showSystemOverlay("Mission Result", main, sub, color, 2000, () => {
+            if(stepsRemaining > 0) { updateSelectableSquares(); updateTurnColor(); } else { endTurn(); }
+        });
+    }
+    showConfirmation();
+}
+
+board.addEventListener("click", (e) => {
+    if(isAwaitingChoice || stepsRemaining <= 0 || isOverlaying) return;
+    let target = e.target.closest(".square.selectable"); if(!target) return;
+    const [_, r, c] = target.id.split("-"), row = parseInt(r), col = parseInt(c);
+    paintSquare(row, col, players[currentPlayer].color, false, currentPlayer);
+    stepsRemaining--;
+    if(boardMap[row][col].isEvent) showEventChoice(row, col);
+    else if(stepsRemaining <= 0) endTurn();
+    else { updateSelectableSquares(); updateTurnColor(); }
+});
+
+diceBtn.onclick = () => {
+    if(isMoving || stepsRemaining > 0 || isAwaitingChoice || isOverlaying) return;
+    isMoving = true; diceBtn.disabled = true; message.textContent = "";
+    const res = Math.floor(Math.random() * 6) + 1;
+    currentX += 1440; currentY += 1440;
+    const rotations = { 1:{x:0,y:0}, 2:{x:-90,y:0}, 3:{x:0,y:-90}, 4:{x:0,y:90}, 5:{x:90,y:0}, 6:{x:0,y:180} };
+    const target = rotations[res];
+    dice.style.transform = `rotateX(${currentX + target.x}deg) rotateY(${currentY + target.y}deg)`;
+    setTimeout(() => { isMoving = false; stepsRemaining = res; message.textContent = `${res}が出ました！`; updateTurnColor(); updateSelectableSquares(); }, 1800);
+};
+
+initBoard();
+paintSquare(0, 0, players[0].color, true); paintSquare(0, 10, players[1].color, true);
+paintSquare(10, 0, players[2].color, true); paintSquare(10, 10, players[3].color, true);
+placeEvents(10); updateTurnColor();
+</script>
+</body>
+</html>
