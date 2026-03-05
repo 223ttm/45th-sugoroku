@@ -2,82 +2,96 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>関テレすごろく（スマホ最適化版）</title>
+<title>関テレすごろく（究極スマホ最適化版）</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>
-    /* 全体の高さを抑える設定 */
+    /* 全体設定：スクロールを徹底排除 */
+    * { box-sizing: border-box; }
     body { 
-        font-family: sans-serif; display: flex; flex-direction: column; align-items: center; 
-        background: #eef2f7; margin: 0; padding: 10px; 
-        height: 100vh; height: 100dvh; overflow: hidden; /* スクロール禁止 */
+        font-family: sans-serif; 
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: #eef2f7; margin: 0; padding: 0; 
+        width: 100vw; height: 100vh; height: 100dvh; 
+        overflow: hidden; touch-action: manipulation;
     }
-    h1 { font-size: 1.2rem; color: #333; margin: 5px 0; }
 
+    h1 { font-size: 1rem; color: #333; margin: 2px 0; }
+
+    /* コントロールエリア：高さを最小限に */
     .controls { 
-        margin-bottom: 10px; text-align: center; background: white; padding: 10px; 
-        border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
-        width: 95%; max-width: 400px; box-sizing: border-box;
+        width: 98%; max-width: 400px;
+        background: white; padding: 5px 10px; 
+        border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        display: flex; flex-direction: column; align-items: center;
+        margin-bottom: 5px;
     }
-    #turnInfo { font-size: 1rem; font-weight: bold; margin-bottom: 5px; }
-    .playerCounts { margin-bottom: 5px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; font-size: 0.8rem; }
-    .playerCounts span { font-weight: bold; padding: 2px 8px; border-radius: 15px; background: #f0f0f0; border: 1px solid #ddd; }
-    #message { color: #d33; font-weight: bold; height: 1.2em; margin-bottom: 5px; font-size: 0.9rem; }
+
+    #turnInfo { font-size: 0.9rem; font-weight: bold; margin-bottom: 2px; }
     
-    /* 盤面のレスポンシブ設定：画面幅いっぱいに収める */
+    .playerCounts { display: flex; justify-content: center; gap: 5px; font-size: 0.7rem; margin-bottom: 2px; }
+    .playerCounts span { font-weight: bold; padding: 1px 6px; border-radius: 10px; background: #f0f0f0; border: 1px solid #ddd; }
+    
+    #message { color: #d33; font-weight: bold; font-size: 0.8rem; height: 1.1em; margin-bottom: 2px; }
+    
+    /* サイコロとボタンを横並びにして高さを節約 */
+    .dice-action-area {
+        display: flex; align-items: center; justify-content: center; gap: 15px; width: 100%;
+    }
+
+    /* 盤面：画面の高さに合わせてサイズを動的に決定 */
     #board { 
         display: grid; 
         grid-template-columns: repeat(11, 1fr); 
         grid-template-rows: repeat(11, 1fr); 
         gap: 0; 
-        width: 95vw; 
-        height: 95vw; /* 正方形を維持 */
-        max-width: 400px; 
-        max-height: 400px;
-        background: transparent; 
+        /* 画面幅か、残りの画面高さの小さい方に合わせる */
+        width: min(95vw, 60vh); 
+        height: min(95vw, 60vh); 
+        max-width: 380px; 
+        max-height: 380px;
+        background: #ccc; 
         position: relative; 
+        border: 1px solid #999;
     }
 
-    .square { 
-        width: 100%; height: 100%; background: white; border: 0.5px solid #ccc; 
-        position: relative; box-sizing: border-box; 
-    }
+    .square { width: 100%; height: 100%; background: white; border: 0.1px solid #eee; position: relative; }
     .empty { visibility: hidden; }
     
     .square.event::after { 
-        content: '★'; position: absolute; inset: 0; border: 2px solid #ff69b4; color: #ff69b4; 
-        display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 3vw; z-index: 25;
+        content: '★'; position: absolute; inset: 0; color: #ff69b4; 
+        display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; z-index: 25;
     }
-    /* スマホでのイベント文字サイズ調整 */
-    @media screen and (min-width: 400px) { .square.event::after { font-size: 14px; } }
 
-    .selectable { outline: 3px solid #ffd700; outline-offset: -3px; z-index: 30; animation: blink 0.8s infinite; }
-    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    .selectable { outline: 2px solid #ffd700; outline-offset: -2px; z-index: 30; animation: blink 0.8s infinite; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     
     .cover { position: absolute; inset: 0; z-index: 20; }
-    .protected-indicator { position: absolute; right: 1px; top: 1px; width: 4px; height: 4px; border-radius: 50%; background: rgba(255,255,255,0.8); z-index: 40; }
+    .protected-indicator { position: absolute; right: 1px; top: 1px; width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,0.8); z-index: 40; }
     
-    /* サイコロをさらにコンパクトに */
-    #diceContainer { perspective: 400px; margin: 5px auto; width: 40px; height: 40px; }
-    #dice { width: 40px; height: 40px; position: relative; transform-style: preserve-3d; transition: transform 1.8s cubic-bezier(.2,.8,.2,1); }
-    .face { position: absolute; width: 40px; height: 40px; background: white; border: 1.5px solid #555; border-radius: 5px; display: flex; align-items: center; justify-content: center; backface-visibility: hidden; }
-    .face img { width: 85%; height: 85%; object-fit: contain; }
-    .front  { transform: rotateY(0deg) translateZ(20px); }
-    .top    { transform: rotateX(90deg) translateZ(20px); }
-    .right  { transform: rotateY(90deg) translateZ(20px); }
-    .left   { transform: rotateY(-90deg) translateZ(20px); }
-    .bottom { transform: rotateX(-90deg) translateZ(20px); }
-    .back   { transform: rotateY(180deg) translateZ(20px); }
+    /* サイコロ：さらに小型化 */
+    #diceContainer { perspective: 400px; width: 30px; height: 30px; }
+    #dice { width: 30px; height: 30px; position: relative; transform-style: preserve-3d; transition: transform 1.5s cubic-bezier(.2,.8,.2,1); }
+    .face { position: absolute; width: 30px; height: 30px; background: white; border: 1px solid #555; border-radius: 3px; display: flex; align-items: center; justify-content: center; backface-visibility: hidden; }
+    .face img { width: 90%; height: 90%; object-fit: contain; }
+    .front  { transform: rotateY(0deg) translateZ(15px); }
+    .top    { transform: rotateX(90deg) translateZ(15px); }
+    .right  { transform: rotateY(90deg) translateZ(15px); }
+    .left   { transform: rotateY(-90deg) translateZ(15px); }
+    .bottom { transform: rotateX(-90deg) translateZ(15px); }
+    .back   { transform: rotateY(180deg) translateZ(15px); }
     
-    button { padding: 8px 20px; font-size: 14px; cursor: pointer; border-radius: 8px; border: none; background: #333; color: white; }
+    button { padding: 6px 15px; font-size: 0.8rem; cursor: pointer; border-radius: 6px; border: none; background: #333; color: white; }
     button:disabled { background: #ccc; }
 
     /* オーバーレイ */
     .full-overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 3000; background: rgba(0,0,0,0.85); opacity: 0; visibility: hidden; transition: 0.3s; }
     .full-overlay.show { opacity: 1; visibility: visible; }
-    .overlay-content { transform: scale(0.7); transition: 0.4s; text-align: center; width: 90%; }
+    .overlay-content { transform: scale(0.7); transition: 0.4s; text-align: center; width: 90%; color: white; }
     .full-overlay.show .overlay-content { transform: scale(1); }
-    .result-text-main { font-size: 3rem; font-weight: 900; margin: 0; }
-    .result-text-sub { font-size: 1.5rem; color: white; margin-top: 10px; }
+    .result-text-main { font-size: 2.5rem; font-weight: 900; margin: 0; }
+    
+    /* モーダル内のボタン調整 */
+    .modal-btn-group { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
 </style>
 </head>
 <body>
@@ -88,31 +102,37 @@
   <div id="turnInfo">準備中...</div>
   <div class="playerCounts" id="playerCounts"></div>
   <div id="message"></div>
-  <div id="diceContainer">
-      <div id="dice">
-          <div class="face front"><img src="hatiemonn1.png" alt="1"></div>
-          <div class="face top"><img src="hatiemonn2.png" alt="2"></div>
-          <div class="face right"><img src="hatiemonn3.png" alt="3"></div>
-          <div class="face left"><img src="hatiemonn4.png" alt="4"></div>
-          <div class="face bottom"><img src="hatiemonn5.png" alt="5"></div>
-          <div class="face back"><img src="hatiemonn6.png" alt="6"></div>
-      </div>
+  
+  <div class="dice-action-area">
+    <div id="diceContainer">
+        <div id="dice">
+            <div class="face front"><img src="hatiemonn1.png" alt="1"></div>
+            <div class="face top"><img src="hatiemonn2.png" alt="2"></div>
+            <div class="face right"><img src="hatiemonn3.png" alt="3"></div>
+            <div class="face left"><img src="hatiemonn4.png" alt="4"></div>
+            <div class="face bottom"><img src="hatiemonn5.png" alt="5"></div>
+            <div class="face back"><img src="hatiemonn6.png" alt="6"></div>
+        </div>
+    </div>
+    <button id="diceBtn">サイコロを振る</button>
   </div>
-  <button id="diceBtn">サイコロを振る</button>
 </div>
 
 <div id="board"></div>
 
 <div id="systemOverlay" class="full-overlay">
     <div class="overlay-content">
-        <div id="sysLabel" style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;"></div>
+        <div id="sysLabel" style="font-size: 1rem; color: #aaa; margin-bottom: 5px;"></div>
         <div id="sysMainText" class="result-text-main"></div>
-        <div id="sysSubText" class="result-text-sub"></div>
+        <div id="sysSubText" style="font-size: 1.2rem; margin-top: 10px;"></div>
     </div>
 </div>
 
 <script>
-// JavaScript ロジックは前回と同じ（変数定義などはそのまま）
+// (既存のJavaScriptロジックをここに貼り付けてください)
+// ※変更点がないため、元のスクリプトをそのまま使用可能です。
+// 便宜上、必要な初期化部分のみ再掲します。
+
 const size = 11;
 let players = [{ color:"#00cc44" }, { color:"#dc143c" }, { color:"#9933ff" }, { color:"#3366ff" }];
 let currentPlayer = 0, stepsRemaining = 0, isMoving = false, isAwaitingChoice = false, isOverlaying = false;
@@ -203,14 +223,14 @@ function updateTurnColor() {
     turnInfo.textContent = `P${currentPlayer+1}の番です${stepsRemaining > 0 ? `（残り ${stepsRemaining}）` : ''}`;
 }
 
-function updatePlayerCounts() { playerCountsEl.innerHTML = players.map((p, i) => `<span style="color:${p.color}">P${i+1}: ${territoryCounts[i]}</span>`).join(''); }
+function updatePlayerCounts() { playerCountsEl.innerHTML = players.map((p, i) => `<span style="color:${p.color}">P${i+1}:${territoryCounts[i]}</span>`).join(''); }
 
 function showSystemOverlay(label, main, sub, color, duration, callback) {
     isOverlaying = true;
     sysLabel.textContent = label;
     sysMainText.textContent = main;
     sysMainText.style.color = color;
-    sysMainText.style.textShadow = `0 0 15px ${color}, 0 0 2px white`;
+    sysMainText.style.textShadow = `0 0 10px ${color}`;
     sysSubText.textContent = sub;
     systemOverlay.classList.add('show');
     setTimeout(() => {
@@ -225,7 +245,7 @@ function endTurn() {
     stepsRemaining = 0;
     diceBtn.disabled = true;
     message.textContent = "";
-    showSystemOverlay("Next Turn", `P${currentPlayer+1}`, "あなたの番です", players[currentPlayer].color, 1200, () => {
+    showSystemOverlay("Next Turn", `P${currentPlayer+1}`, "あなたの番です", players[currentPlayer].color, 1000, () => {
         updateTurnColor(); updateSelectableSquares(); diceBtn.disabled = false;
     });
 }
@@ -243,16 +263,15 @@ function showEventChoice(row, col) {
     isAwaitingChoice = true;
     const pColor = players[currentPlayer].color;
     const overlay = document.createElement('div');
-    overlay.style.cssText = `position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 1000; animation: fadeIn 0.3s ease-out;`;
+    overlay.style.cssText = `position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000;`;
     document.body.appendChild(overlay);
 
     function showConfirmation() {
-        overlay.innerHTML = `<div style="background: white; padding: 20px; border-radius: 20px; text-align: center; border: 5px solid #ffd700; width: 80%; max-width: 300px;"><h3 style="color: #ff69b4; margin: 0 0 10px;">★ EVENT ★</h3><p style="font-size:0.9rem;">ミッションに挑戦する？</p><div style="display: flex; gap: 10px; justify-content: center;"><button id="btnChallenge" style="background: #ff4d4d; color: white; padding: 8px 15px; border-radius: 50px; font-size:0.8rem;">挑戦する！</button><button id="btnSkip" style="background: #888; color: white; padding: 8px 15px; border-radius: 50px; font-size:0.8rem;">やめておく</button></div></div>`;
+        overlay.innerHTML = `<div style="background: white; padding: 15px; border-radius: 15px; text-align: center; border: 4px solid #ffd700; width: 85%; max-width: 280px;"><h3 style="color: #ff69b4; margin: 0 0 5px; font-size:1.1rem;">★ EVENT ★</h3><p style="font-size:0.8rem; margin:5px 0;">ミッションに挑戦する？</p><div class="modal-btn-group"><button id="btnChallenge" style="background: #ff4d4d; color: white; padding: 6px 12px; border-radius: 20px; font-size:0.8rem;">挑戦！</button><button id="btnSkip" style="background: #888; color: white; padding: 6px 12px; border-radius: 20px; font-size:0.8rem;">やめる</button></div></div>`;
         document.getElementById('btnChallenge').onclick = () => {
-            overlay.innerHTML = `<div style="background: white; padding: 30px; border-radius: 20px; text-align: center; border: 5px solid ${pColor}; width: 80%; max-width: 300px;"><h3>Now challenging</h3><div style="font-size: 2rem; font-weight: 900; color: ${pColor}; margin: 10px 0;">P${currentPlayer+1}</div><p style="font-size:0.8rem;">ミッション実行中…</p><button id="btnFinish" style="background: #333; color: white; padding: 10px 20px; border-radius: 10px;">終了</button></div>`;
+            overlay.innerHTML = `<div style="background: white; padding: 20px; border-radius: 15px; text-align: center; border: 4px solid ${pColor}; width: 85%; max-width: 280px;"><h3>Now challenging</h3><div style="font-size: 1.8rem; font-weight: 900; color: ${pColor};">P${currentPlayer+1}</div><p style="font-size:0.8rem;">ミッション実行中…</p><button id="btnFinish" style="background: #333; color: white; padding: 8px 16px; border-radius: 8px;">終了</button></div>`;
             document.getElementById('btnFinish').onclick = () => {
-                // SUCCESSとFAILEDのボタン間隔を gap: 20px に広げました
-                overlay.innerHTML = `<div style="background: white; padding: 20px; border-radius: 20px; text-align: center; border: 5px solid #ff4500; width: 80%; max-width: 300px;"><h3>Result</h3><p style="font-size:0.8rem;">結果を教えてね！</p><div style="display: flex; gap: 20px; justify-content: center;"><button id="btnSuccess" style="background: #00c853; color: white; padding: 10px 20px; border-radius: 50px;">SUCCESS</button><button id="btnFailure" style="background: #d50000; color: white; padding: 10px 20px; border-radius: 50px;">FAILED</button></div></div>`;
+                overlay.innerHTML = `<div style="background: white; padding: 15px; border-radius: 15px; text-align: center; border: 4px solid #ff4500; width: 85%; max-width: 280px;"><h3>Result</h3><div class="modal-btn-group"></div><p style="font-size:0.8rem;">結果はどうだったかな？</p><button id="btnSuccess" style="background: #00c853; color: white; padding: 8px 16px; border-radius: 20px; font-size:0.8rem;">SUCCESS</button><button id="btnFailure" style="background: #d50000; color: white; padding: 8px 16px; border-radius: 20px; font-size:0.8rem;">FAILED</button></div></div>`;
                 document.getElementById('btnSuccess').onclick = () => handleResult(true);
                 document.getElementById('btnFailure').onclick = () => handleResult(false);
             };
@@ -266,7 +285,7 @@ function showEventChoice(row, col) {
         let main, sub, color;
         if(isSuccess) { stepsRemaining += 2; main = "SUCCESS!!"; sub = "+2マス！"; color = "#00c853"; } 
         else { color = "#d50000"; main = "FAILED..."; if(stepsRemaining >= 2) { stepsRemaining -= 2; sub = "-2マス"; } else { stepsRemaining = 0; revertOwnTerritoryByHistory(currentPlayer, 2); sub = "陣地没収！"; } }
-        showSystemOverlay("Result", main, sub, color, 1500, () => { if(stepsRemaining > 0) { updateSelectableSquares(); updateTurnColor(); } else { endTurn(); } });
+        showSystemOverlay("Result", main, sub, color, 1200, () => { if(stepsRemaining > 0) { updateSelectableSquares(); updateTurnColor(); } else { endTurn(); } });
     }
     showConfirmation();
 }
@@ -290,7 +309,7 @@ diceBtn.onclick = () => {
     const rotations = { 1:{x:0,y:0}, 2:{x:-90,y:0}, 3:{x:0,y:-90}, 4:{x:0,y:90}, 5:{x:90,y:0}, 6:{x:0,y:180} };
     const target = rotations[res];
     dice.style.transform = `rotateX(${currentX + target.x}deg) rotateY(${currentY + target.y}deg)`;
-    setTimeout(() => { isMoving = false; stepsRemaining = res; message.textContent = `${res}が出ました！`; updateTurnColor(); updateSelectableSquares(); }, 1800);
+    setTimeout(() => { isMoving = false; stepsRemaining = res; message.textContent = `${res}が出ました！`; updateTurnColor(); updateSelectableSquares(); }, 1500);
 };
 
 initBoard();
